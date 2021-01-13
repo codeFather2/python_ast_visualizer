@@ -2,6 +2,7 @@ from errors import LexingError
 from enum import Enum
 import re
 
+
 class Token:
     def __init__(self, token_type, value, position):
         self.token_type = token_type
@@ -15,13 +16,15 @@ class Token:
     def __repr__(self):
         return self.__str__()
 
+
 trailing_tokens = [' ', '\n', '\r', '\t']
 quotes = ['\'', '\"']
 
 keyword_or_name_regex: re.Pattern = re.compile(r'(\w|_)([0-9]|\w|_)*')
 number_regex: re.Pattern = re.compile(r'[1-9](\d)*')
 operator_punctuator_regex: re.Pattern = re.compile(r'[^a-zA-Z0-9_]')
-comment_regex: re.Pattern = re.compile(r'\#.*?[\r\n\f]')
+comment_regex: re.Pattern = re.compile(r'\#.*?([\r\n\f]|$)')
+
 
 class Tokenizer:
 
@@ -31,19 +34,18 @@ class Tokenizer:
         self.text_len = len(text)
 
     def tokenize(self) -> (list, LexingError):
-        res: list = []
+        tokens: list = []
         error: LexingError = None
         while self.index < self.text_len:
             token, error = self.try_get_next_token()
 
             if error is not None:
-                return (res, error)
-            res.append(token)
+                return (tokens, error)
+            tokens.append(token)
 
-        if self.index >= self.text_len:
-            res.append(Token(TokenType.EOF, None, self.text_len))
-
-        return (res, error)
+        if tokens[-1].token_type != TokenType.EOF:
+            tokens.append(Token(TokenType.EOF, None, self.text_len))
+        return (tokens, error)
 
     def try_get_next_token(self) -> (Token, LexingError):
         try:
@@ -55,8 +57,10 @@ class Tokenizer:
 
     def next_token(self) -> Token:
         current = self.text[self.index]
-        while current in trailing_tokens:
+        while current  in trailing_tokens:
             self.index += 1
+            if self.index >= self.text_len:
+                return Token(TokenType.EOF, None, self.text_len)
             current = self.text[self.index]
         token = None
 
@@ -80,7 +84,8 @@ class Tokenizer:
             return next_string()
 
         token_text = self.get_token_text(keyword_or_name_regex)
-        token_type = keywords.get(token_text, None) #Can be replaced by token_text.iskeyword()
+        # Can be replaced by token_text.iskeyword()
+        token_type = keywords.get(token_text, None)
 
         if token_type:
             return Token(token_type, token_text, self.index)
@@ -110,7 +115,8 @@ class Tokenizer:
 
     def next_comment(self) -> Token:
         token_text = self.get_token_text(comment_regex)
-        return Token(TokenType.COMMENT, token_text[:-1], self.index) #remove trailing control characters
+        # remove trailing control characters
+        return Token(TokenType.COMMENT, token_text.rstrip(), self.index)
 
     def next_operator_punctuator(self) -> Token:
         token_text = self.get_token_text(operator_punctuator_regex)
@@ -118,8 +124,9 @@ class Tokenizer:
         if not token_type:
             token_type = punctuators.get(token_text, None)
         if not token_type:
-            raise LexingError(index=self.index, msg='Unexpected operator or punctuator')
-        
+            raise LexingError(index=self.index,
+                              msg='Unexpected operator or punctuator')
+
         return Token(token_type, token_text, self.index)
 
     def get_token_text(self, regex: re.Pattern) -> Token:
@@ -137,6 +144,7 @@ class Tokenizer:
 
     def get_symbol(self, index: int) -> str:
         return self.text[index] if index < self.text_len else None
+
 
 class TokenType(Enum):
     EOF = -1
@@ -248,6 +256,7 @@ class TokenType(Enum):
     FLOAT = 89
 
     COMMENT = 90
+
 
 keywords = {
     'def': TokenType.DEF,
