@@ -114,6 +114,7 @@ class TokenType(Enum):
     INDENT = 92
     DEDENT = 93
     NEWLINE = 94
+    PEGPARSER = 95
 
 
 keywords = {
@@ -147,6 +148,7 @@ keywords = {
     'await': TokenType.AWAIT,
     'nonlocal': TokenType.NONLOCAL,
     'True': TokenType.TRUE,
+    '__peg_parser__': TokenType.PEGPARSER,
     'False': TokenType.FALSE,
     'or': TokenType.OR,
     'and': TokenType.AND,

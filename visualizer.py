@@ -16,7 +16,7 @@ class Visualizer:
     
     def create_subtree(self, node: nodes.Node) -> str:
         key = str(self.id)
-        value = node.value if hasattr(node, 'value')  else node.children.__str__()
+        value = node.value if hasattr(node, 'value')  else ' '.join(map(lambda x : x.__str__(), node.children))
         self.graph.node(key, f'{node.__class__.__name__}\n {value}')
         self.id += 1
         if hasattr(node, 'children'):

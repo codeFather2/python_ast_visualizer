@@ -5,6 +5,7 @@ from typing import List, Tuple
 import re
 
 compound_stmt_tokens = [tt.FOR, tt.DEF, tt.IF, tt.CLASS, tt.WITH, tt.TRY, tt.WHILE]
+comparison_tokens = [tt.EQUALS, tt.NOT_EQ_1, tt.NOT_EQ_2, tt.LT_EQ, tt.LESS_THAN, tt.GT_EQ, tt.GREATER_THAN]
 operator_tokens = [
     tt.STAR,
     tt.ADD,

@@ -7,4 +7,8 @@ class LexingError(Exception):
 
 
 class ParsingError(Exception):
-    pass
+    def __init__(self, ex: Exception = None, index: int = 0, msg=''):
+        self.original = ex
+        self.index = index
+        self.msg = f'ParsingError ({repr(ex) + ": " + msg if ex else msg}) at position: {self.index}'
+        super().__init__(self.msg)
