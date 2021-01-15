@@ -24,7 +24,7 @@ trailing_tokens = [' ', '\r', '\t']
 quotes = ['\'', '\"']
 
 keyword_or_name_regex: re.Pattern = re.compile(r'(\w|_)([0-9]|\w|_)*')
-number_regex: re.Pattern = re.compile(r'[1-9](\d)*')
+number_regex: re.Pattern = re.compile(r'(0([0_]+|[bB][01_]+|[oO][0-7_]+|[xX][0-9a-fA-F_]+)?|[1-9][0-9_]*)(\.\d+)?') #decimal, bin, hex, oct, float
 operator_punctuator_regex: re.Pattern = re.compile(r'([^a-zA-Z0-9_\s:])+|:| :=')
 comment_regex: re.Pattern = re.compile(r'\#.*?([\r\n\f]|$)')
 
