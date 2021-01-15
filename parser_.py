@@ -338,10 +338,38 @@ class Parser:
             return assignment_expr
 
     def assignment(self) -> nodes.AssignmentExpression:
+        current = self.current_token
+        if current.type == tt.NAME and self.right_token().type == tt.COLON:
+            return self.var_decl()
+            #TODO: continue here
         left = self.atom()
         operator = self.assign_op()
         right = self.atom()
         return nodes.AssignmentExpression(union_spans(left.span, right.span), left, operator, right)
+
+    def var_decl(self) -> nodes.Expression:
+        name = self.atom()
+        self.move_next() #move next
+        annotation = self.expression()
+        assign_part = None
+        assign_op = None
+        if self.current_token.type == tt.ASSIGN:
+            assign_op = nodes.OperatorLiteral(self.current_token.span, self.current_token.value)
+            self.move_next()
+            assign_part = self.annotated_rhs()
+
+        if assign_part:
+            span = union_spans(name.span, assign_part.span)
+        else:
+            span = union_spans(name.span, annotation.span)
+
+        return nodes.AssignmentExpression(span, name, assign_op, assign_part, annotation)
+
+    def annotated_rhs(self) -> nodes.Node:
+        if self.current_token.type == tt.YIELD:
+            return self.yield()
+        else:
+            return self.star_expressions()
 
     def atom(self) -> nodes.Terminal:
         current = self.current_token
@@ -372,6 +400,23 @@ class Parser:
         self.move_next()
         node : nodes.Expression= self.star_expressions()
         return nodes.ReturnStatement(nodes.TextSpan(keyword.position, node.span.end - keyword.position), node)
+
+    def star_expressions(self) -> nodes.Node:
+        exprs = [self.star_expression()]
+        while self.current_token.type == tt.COMMA:
+            self.move_next()
+            exprs.append(self.star_expression())
+        if len(exprs) == 1:
+            return exprs[0]
+
+        return nodes.CollectionNode(union_spans(exprs[0].span, exprs[-1].span), exprs)
+
+    def star_expression(self) -> nodes.Expression:
+        if (op_token := self.current_token).type == tt.STAR:
+            op = nodes.OperatorLiteral(op_token.span, op_token.value)
+            expr = self.bitwise_or()
+            return nodes.UnaryOperatorExpression(union_spans(op.span, expr.span), op, expr)
+        return self.expression()
 
     def move_next(self) -> Token:
         self._index += 1

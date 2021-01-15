@@ -156,8 +156,12 @@ class UnaryOperatorExpression(Expression):
         self.expr = expr
 
 class AssignmentExpression(Expression):
-    def __init__(self, span: TextSpan, left: Expression, operator: OperatorLiteral, right: Expression) -> None:
+    def __init__(self, span: TextSpan, left: Expression, operator: OperatorLiteral, right: Expression, annotation: Expression = None) -> None:
         super().__init__(span, [left, operator, right])
+        self.left = left
+        self.right = right
+        self.operator = operator
+        self.annotation = annotation
 
 class IndexerExpression(Expression):
     def __init__(self, span: TextSpan, target: Expression, index: Expression) -> None:

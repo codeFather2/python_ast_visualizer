@@ -7,7 +7,7 @@ from logger import create_logger
 
 def main():
     print('AST builder/visualizer is currently under development...')
-    filename = 'testdata/parser_test_example.py'
+    filename = 'testdata/parser_test_loops.py'
     test_file = open(filename, 'r')
     logger =  create_logger()
     tokenizer = Tokenizer(test_file.read(), logger)
