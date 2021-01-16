@@ -347,6 +347,12 @@ class Parser:
             return self.star_expressions()
         else:
             return assignment_expr
+    
+    def return_stmt(self) -> nodes.ReturnStatement:
+        keyword = self.current_token
+        self.move_next()
+        expr = self.expression()
+        return nodes.ReturnStatement(union_spans(keyword.span, expr.span), expr)
 
     def assignment(self) -> nodes.AssignmentExpression:
         current = self.current_token

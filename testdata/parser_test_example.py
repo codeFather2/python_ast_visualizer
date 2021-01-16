@@ -1,3 +1,10 @@
+def test_func(count_iters):
+    sum = 0
+    for i in range(count_iters):
+        for j in range(count_iters):
+            sum += 1
+    return sum
+
 def main():
     print(1)
 
