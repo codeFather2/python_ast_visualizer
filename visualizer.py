@@ -17,53 +17,50 @@ class Visualizer:
         self.id = 0
         self.graph = g.Digraph(f"Visualizing of {file_name}")
         self.source_code = source_code
+        self.fields_to_exclude = ['children', 'value', 'span', 'wrapped_tokens']
 
     def visualize(self, mode : VisualizingMode):
         self.id = 0
         self.graph = g.Digraph(f"Visualizing of {self.file_name}")
 
         if mode == VisualizingMode.AST:
-            self.visualize_ast('Root', self.root)
+            self.visualize_('Root', self.root, self.visualize_ast)
         elif mode == VisualizingMode.EXECUTION:
-            self.visualize_execution('Entry', self.root)
+            self.visualize_('Root', self.root, self.visualize_execution)
         self.graph.render(f'output/output{mode}')
-    
-    def visualize_ast(self, node_name: str, node: nodes.Node) ->  str:
-        key = str(self.id)
-        node_name = node_name.capitalize() if len(node_name) > 0 else node.__class__.__name__
-        self.graph.node(key, f'{node_name}\n\n{self.get_text_for_node(node)}')
-        self.id += 1
-        fields_to_exclude = ['children', 'value', 'span']
-        children = list(filter(lambda x: x[0] not in fields_to_exclude, node.__dict__.items()))
+
+    def visualize_(self, node_name: str, node: nodes.Node, handler) -> str:
+        key = self.add_node(node_name, node)
+        children = self.get_children(node)
         
+        if isinstance(node, nodes.WrapperNode):
+            return key
+
+        return handler(key, node, children)
+    
+    def visualize_ast(self, key: str, node: nodes.Node, children: list) ->  str:
         if len(children) == 0 and hasattr(node, 'children'):
             for child in node.children:
-                child_key = self.visualize_ast('', child)
+                child_key = self.visualize_('', child, self.visualize_ast)
                 self.graph.edge(key, child_key)
         else:
             for name, child in children:
                 if child is None:
                     continue
-                child_key = self.visualize_ast(name, child)
+                child_key = self.visualize_(name, child, self.visualize_ast)
                 self.graph.edge(key, child_key)
         return key
 
-    def visualize_execution(self, node_name: str, node: nodes.Node) ->  str:
-        key = str(self.id)
-        node_name = node_name.capitalize() if len(node_name) > 0 else node.__class__.__name__
-        self.graph.node(key, f'{node_name}\n\n{self.get_text_for_node(node)}')
-        self.id += 1
-        fields_to_exclude = ['children', 'value', 'span']
-        children = list(filter(lambda x: x[0] not in fields_to_exclude, node.__dict__.items()))
+    def visualize_execution(self, key: str, node: nodes.Node, children: list) ->  str:
         child_keys: List[str] = []
         if len(children) == 0 and hasattr(node, 'children'):
             for child in node.children:
-                child_keys.append(self.visualize_execution('', child))
+                child_keys.append(self.visualize_('', child, self.visualize_execution))
         else:
             for name, child in children:
                 if child is None:
                     continue
-                child_keys.append(self.visualize_execution(name, child))
+                child_keys.append(self.visualize_(name, child, self.visualize_execution))
 
         if len(child_keys) > 0:
             self.graph.edge(key, child_keys[0])
@@ -72,6 +69,16 @@ class Visualizer:
                 prev = child_keys[index - 1]
                 self.graph.edge(prev, current)
         return key
+
+    def add_node(self, node_name: str, node: nodes.Node) -> str:
+        key = str(self.id)
+        node_name = node_name.capitalize() if len(node_name) > 0 else node.__class__.__name__
+        self.graph.node(key, f'{node_name}\n\n{self.get_text_for_node(node)}')
+        self.id += 1
+        return key
+
+    def get_children(self, node: nodes.Node) -> list:
+        return list(filter(lambda x: x[0] not in self.fields_to_exclude, node.__dict__.items()))
 
     def get_text_for_node(self, node: nodes.Node) -> str:
         if isinstance(node, TokenType):

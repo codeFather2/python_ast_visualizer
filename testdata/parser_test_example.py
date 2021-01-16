@@ -1,3 +1,6 @@
+def main():
+    print(1)
+
 hex_ = 0x1f234
 bin_ = 0b101011
 oct_ = 0O11740

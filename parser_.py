@@ -124,7 +124,15 @@ class Parser:
         return nodes.WhileStatement(span, condition, block)
 
     def def_stmt(self) -> nodes.DefinitionStatement:
-        raise NotImplementedError('def_stmt')
+        def_ = self.current_token
+        name_token = self.move_next()
+        name = nodes.IdToken(name_token.span, name_token.value)
+        self.move_next()
+        signature_line = self.take_until_type(self._tokens[self._index:], tt.COLON)
+        signature = nodes.WrapperNode(union_spans(signature_line[0].span, signature_line[-1].span), signature_line)
+        self.move_next(len(signature_line))
+        block = self.block()
+        return nodes.DefinitionStatement(union_spans(def_.span, block.span), name, signature, block)
 
     def class_stmt(self) -> nodes.Statement:
         raise NotImplementedError('class_stmt')
@@ -489,8 +497,8 @@ class Parser:
             return nodes.UnaryOperatorExpression(union_spans(op.span, expr.span), op, expr)
         return self.named_expr()
 
-    def move_next(self) -> Token:
-        self._index += 1
+    def move_next(self, offset : int = 1) -> Token:
+        self._index += offset
         return self._tokens[self._index] if self._index < self._tokens_len else None
 
     def right_token(self, offset: int = 1):

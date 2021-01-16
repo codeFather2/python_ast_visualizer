@@ -1,3 +1,4 @@
+from lexer import Token
 from typing import List
 from text_span import TextSpan, union_spans
 
@@ -23,8 +24,10 @@ class CollectionNode(Node):
 
 # for unsupported nodes
 class WrapperNode(Node):
-    def __init__(self, span: TextSpan, children: List[BaseNode] = []) -> None:
-        super().__init__(span, children)
+    def __init__(self, span: TextSpan, name : str = '', wrapped_tokens: List[Token] = None) -> None:
+        super().__init__(span)
+        self.name = name
+        self.wrapped_tokens = wrapped_tokens
 
 class Root(Node):
     def __init__(self, span: TextSpan, nodes: List[Node] = []) -> None:
@@ -195,11 +198,9 @@ class MemberReference(Expression):
 
 
 class DefinitionStatement(Statement):
-    def __init__(self, span: TextSpan, name: IdToken, parameters: CollectionNode, body: Statement) -> None:
-        children = [name]
-        children.extend(parameters.children.copy())
-        children.append(body)
+    def __init__(self, span: TextSpan, name: IdToken, signature: Node, body: Statement) -> None:
+        children = [name, signature, body]
         super().__init__(span, children=children)
         self.name = name
-        self.parameters = parameters
+        self.signature = signature
         self.body = body
