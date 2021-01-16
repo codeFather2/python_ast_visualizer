@@ -10,7 +10,7 @@ while j < 10:
     j += 1
     for i in range(b):
         if i % 2 == 1:
-            continue
+            print(i)
         else:
             break
-        sum += 1
+    sum = 1 + j

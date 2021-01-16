@@ -1,3 +1,4 @@
 for i in range(100):
     for j in range(100):
         print(j)
+        a = 2+2*2
