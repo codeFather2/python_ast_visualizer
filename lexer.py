@@ -68,11 +68,14 @@ class Tokenizer:
 
     def next_token(self):
         current_symbol = None
-
         last = self._last_token
-
         if last and last.type == TokenType.NEWLINE:
-            self.handle_indenting()
+            line = take_symbols_until(self.text[self._index:], '\n')
+            for s in line:
+                if s not in trailing_tokens:
+                    self.handle_indenting()
+                    break
+            self.skip_trailing()
             current_symbol = self.text[self._index]
         else:
             current_symbol = self.skip_trailing()
@@ -194,3 +197,24 @@ class Tokenizer:
 
     def get_symbol(self, index: int) -> str:
         return self.text[index] if index < self._text_len else None
+
+
+
+def take_tokens_until_type(tokens : List[Token], end_type : TokenType, include_last = False):
+        res : List[Token] = []
+        for item in tokens:
+            if item.type != end_type:
+                res.append(item)
+            else:
+                if include_last:
+                    res.append(item)
+                return res
+        return res
+
+def take_symbols_until(text: str, end_symbol, include_last = False):
+    index = 0
+    for symbol in text:
+        if symbol == end_symbol:
+            return text[:index]
+        index+=1
+    return text

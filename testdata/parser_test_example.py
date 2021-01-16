@@ -1,5 +1,21 @@
 def test_func(count_iters):
-    sum = 0
+
+    sum_1 = 0
+    sum_2 = 0
+
+    while sum_1 <= count_iters:
+        sum_2 += 1
+        
+        while sum_2 <= count_iters:
+            sum_1 += 1
+
+    return sum_1 + sum_2
+
+
+def test_func(count_iters):
+
+    sum_1 = 0
+
     for i in range(count_iters):
         for j in range(count_iters):
             sum += 1
@@ -24,3 +40,8 @@ while j < 10:
         else:
             break
     sum = 1 + j
+
+for i in range(100):
+    for j in range(100):
+        print(j)
+        a = 2+2*2

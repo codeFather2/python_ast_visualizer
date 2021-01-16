@@ -2,7 +2,7 @@ import re
 import nodes
 from typing import List
 from lexer_utils import TokenType as tt
-from lexer import Token
+from lexer import Token, take_tokens_until_type
 from parser_utils import compound_stmt_tokens, comparison_tokens, assign_tokens
 from logging import Logger
 from errors import ParsingError
@@ -128,7 +128,7 @@ class Parser:
         name_token = self.move_next()
         name = nodes.IdToken(name_token.span, name_token.value)
         self.move_next()
-        signature_line = self.take_until_type(self._tokens[self._index:], tt.COLON)
+        signature_line = take_tokens_until_type(self._tokens[self._index:], tt.COLON)
         signature = nodes.WrapperNode(union_spans(signature_line[0].span, signature_line[-1].span), signature_line)
         self.move_next(len(signature_line))
         block = self.block()
@@ -147,12 +147,15 @@ class Parser:
         #skip colon
         current = self.move_next()
         if current.type == tt.NEWLINE:
+            while self.current_token.type == tt.NEWLINE:
+                self.move_next()
             statements : nodes.Node = []
-            indent = self.move_next()
-            if indent.type == tt.INDENT:
+            if self.current_token.type == tt.INDENT:
                 self.move_next()
                 while self.current_token.type != tt.DEDENT:
                     statements.append(self.statement())
+                    while self.current_token.type == tt.NEWLINE:
+                        self.move_next()
                 self.move_next()
             return nodes.BlockStatement(union_spans(statements[0].span, statements[-1].span), statements)
         else:
@@ -356,7 +359,7 @@ class Parser:
 
     def assignment(self) -> nodes.AssignmentExpression:
         current = self.current_token
-        line = self.take_until_type(self._tokens[self._index : ], tt.NEWLINE)
+        line = take_tokens_until_type(self._tokens[self._index : ], tt.NEWLINE)
         line_types = set(map(lambda x: x.type, line))
         if not set(assign_tokens) & set(line_types):
             return None #TODO: complete decomposition assignments. if time remains
@@ -419,7 +422,7 @@ class Parser:
         raise NotImplementedError(f'atom with value {current}')
 
     def tuple_group_generator(self) -> nodes.Expression:
-        line = self.take_until_type(self._tokens[self._index : ], tt.NEWLINE)
+        line = take_tokens_until_type(self._tokens[self._index : ], tt.NEWLINE)
         line_types = list(map(lambda x: x.type, line))
         if tt.FOR in line_types:
             return self.generator()
@@ -428,7 +431,7 @@ class Parser:
         return self.tuple_()
 
     def list_(self) -> nodes.CollectionExpression:
-        line = self.take_until_type(self._tokens[self._index : ], tt.NEWLINE)
+        line = take_tokens_until_type(self._tokens[self._index : ], tt.NEWLINE)
         line_types = list(map(lambda x: x.type, line))
         if tt.FOR in line_types:
             return self.generator()
@@ -517,12 +520,3 @@ class Parser:
 
     def match(self, token_type: int, token: Token):
         return token_type == token.type
-    
-    def take_until_type(self, tokens : List[Token], end_type : tt):
-        res : List[Token] = []
-        for item in tokens:
-            if item.type != end_type:
-                res.append(item)
-            else:
-                return res
-        return res
