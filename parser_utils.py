@@ -30,6 +30,24 @@ operator_tokens = [
     tt.AT,
 ]
 
+assign_tokens = [
+    tt.ASSIGN,
+    tt.ASSIGN2,
+    tt.ADD_ASSIGN,
+    tt.SUB_ASSIGN,
+    tt.MULT_ASSIGN,
+    tt.AT_ASSIGN,
+    tt.DIV_ASSIGN,
+    tt.MOD_ASSIGN,
+    tt.AND_ASSIGN,
+    tt.OR_ASSIGN,
+    tt.XOR_ASSIGN,
+    tt.LEFT_SHIFT_ASSIGN,
+    tt.RIGHT_SHIFT_ASSIGN,
+    tt.POWER_ASSIGN,
+    tt.IDIV_ASSIGN
+]
+
 unary_operator_tokens = [
     tt.DIV,
     tt.ADD,

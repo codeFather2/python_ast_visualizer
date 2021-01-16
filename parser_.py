@@ -3,9 +3,10 @@ import nodes
 from typing import List
 from lexer_utils import TokenType as tt
 from lexer import Token
-from parser_utils import compound_stmt_tokens, comparison_tokens
-from logging import Logger, currentframe
+from parser_utils import compound_stmt_tokens, comparison_tokens, assign_tokens
+from logging import Logger
 from errors import ParsingError
+from text_span import TextSpan, union_spans
 
 
 class Parser:
@@ -52,7 +53,7 @@ class Parser:
             else:
                 node = self.simple_stmt()
         except Exception as ex:
-            self.logger.error(repr(ex))
+            self.logger.error(f'{repr(ex)} {self.current_token.span}')
 
         return node
 
@@ -66,7 +67,7 @@ class Parser:
         if c_type == tt.WHILE:
             return self.while_stmt()
         if c_type == tt.DEF:
-            return self.def_stmt
+            return self.def_stmt()
         if c_type == tt.CLASS:
             return self.class_stmt()
         if c_type == tt.TRY:
@@ -121,7 +122,19 @@ class Parser:
         
         span = union_spans(keyword.span, else_block.span if else_block else block.span)
         return nodes.WhileStatement(span, condition, block)
-    
+
+    def def_stmt(self) -> nodes.DefinitionStatement:
+        raise NotImplementedError('def_stmt')
+
+    def class_stmt(self) -> nodes.Statement:
+        raise NotImplementedError('class_stmt')
+
+    def try_stmt(self) -> nodes.Statement:
+        raise NotImplementedError('try_stmt')
+
+    def with_stmt(self) -> nodes.Statement:
+        raise NotImplementedError('with_stmt')
+
     def block(self) -> nodes.Statement:
         #skip colon
         current = self.move_next()
@@ -132,7 +145,8 @@ class Parser:
                 self.move_next()
                 while self.current_token.type != tt.DEDENT:
                     statements.append(self.statement())
-            return nodes.BlockStatement(union_spans(indent.span, self.move_next().span), statements)
+                self.move_next()
+            return nodes.BlockStatement(union_spans(statements[0].span, statements[-1].span), statements)
         else:
             return self.simple_stmt()
     
@@ -146,7 +160,6 @@ class Parser:
 
     def expression(self) -> nodes.Expression:
         if self.current_token.type == tt.LAMBDA:
-            raise NotImplementedError('lambda')
             return self.lambda_()
         expr = self.disjunction()
         if self.current_token.type == tt.IF:
@@ -156,6 +169,9 @@ class Parser:
             false_branch = self.expression()
             return nodes.ConditionalExpression(union_spans(expr.span, false_branch.span), condition, expr, false_branch)
         return expr
+
+    def lambda_(self) -> nodes.LambdaExpression:
+        raise NotImplementedError('lambda_')
 
     def disjunction(self) -> nodes.Expression:
         return self.binary_by_priority(self.conjunction, [tt.OR])
@@ -283,18 +299,6 @@ class Parser:
             result = nodes.BinaryOperatorExpression(union_spans(result.span, right.span), result, op, right)
         return result
 
-    def def_stmt(self) -> nodes.ForStatement:
-        raise NotImplementedError('def_stmt')
-
-    def class_stmt(self) -> nodes.ForStatement:
-        raise NotImplementedError('class_stmt')
-
-    def try_stmt(self) -> nodes.ForStatement:
-        raise NotImplementedError('try_stmt')
-
-    def with_stmt(self) -> nodes.ForStatement:
-        raise NotImplementedError('with_stmt')
-
     def simple_stmt(self) -> nodes.Node:
         try:
             result = self.small_stmt()
@@ -306,6 +310,7 @@ class Parser:
             return result
         except Exception as ex:
             self.logger.error(repr(ex))
+            self.move_next()
 
         return None
 
@@ -316,20 +321,18 @@ class Parser:
         if current.type in [tt.PASS, tt.BREAK, tt.CONTINUE]:
             self.move_next()
             return nodes.Terminal(current.span, current.value)
-        if current.type == tt.DEL:
-            raise NotImplementedError()
-        if current.type == tt.YIELD:
-            raise NotImplementedError()
-        if current.type == tt.ASSERT:
-            raise NotImplementedError()
-        if current.type == tt.RAISE:
-            raise NotImplementedError()
-        if current.type == tt.GLOBAL:
-            raise NotImplementedError()
-        if current.type == tt.NONLOCAL:
-            raise NotImplementedError()
         if current.type == tt.STAR:
-            raise NotImplementedError()
+            return self.star_expressions()
+        if current.type == tt.DEL:
+            raise NotImplementedError('del_stmt')
+        if current.type == tt.YIELD:
+            return self.yield_expr('yield_stmt')
+        if current.type == tt.ASSERT:
+            raise NotImplementedError('assert_stmt')
+        if current.type == tt.RAISE:
+            raise NotImplementedError('raise_stmt')
+        if current.type in [tt.GLOBAL, tt.NONLOCAL]:
+            raise NotImplementedError('global_nonlocal_stmt')
 
         assignment_expr = self.assignment()
         if not assignment_expr:
@@ -339,12 +342,16 @@ class Parser:
 
     def assignment(self) -> nodes.AssignmentExpression:
         current = self.current_token
+        line = self.take_until_type(self._tokens[self._index : ], tt.NEWLINE)
+        line_types = set(map(lambda x: x.type, line))
+        if not set(assign_tokens) & set(line_types):
+            return None #TODO: complete decomposition assignments. if time remains
+
         if current.type == tt.NAME and self.right_token().type == tt.COLON:
             return self.var_decl()
-            #TODO: continue here
         left = self.atom()
         operator = self.assign_op()
-        right = self.atom()
+        right = self.star_expressions()
         return nodes.AssignmentExpression(union_spans(left.span, right.span), left, operator, right)
 
     def var_decl(self) -> nodes.Expression:
@@ -367,26 +374,73 @@ class Parser:
 
     def annotated_rhs(self) -> nodes.Node:
         if self.current_token.type == tt.YIELD:
-            return self.yield()
+            return self.yield_expr()
         else:
             return self.star_expressions()
 
     def atom(self) -> nodes.Terminal:
         current = self.current_token
+        current_t = current.type
         self.move_next()
-        if current.type == tt.NAME:
+        if current_t == tt.NAME:
             return nodes.IdToken(current.span, current.value)
-        if current.type == tt.STRING:
+        if current_t == tt.STRING:
             return nodes.StringLiteral(current.span, current.value)
-        if current.type == tt.NUMBER:
+        if current_t == tt.NUMBER:
             return nodes.NumberLiteral(current.span, current.value)
-        if current.type == tt.NONE:
+        if current_t == tt.NONE:
             return nodes.NoneLiteral(current.span, current.value)
-        if current.type == tt.PEGPARSER:
+        if current_t == tt.PEGPARSER:
             return nodes.EasterEggLiteral(current.span, current.value)
-        if current.type in [tt.TRUE, tt.FALSE]:
+        if current_t in [tt.TRUE, tt.FALSE]:
             return nodes.BooleanLiteral(current.span, current.value)
+        if current_t == tt.OPEN_PAREN:
+            return self.tuple_group_generator()
+        if current_t == tt.OPEN_BRACKET:
+            return self.list_()
+        if current_t == tt.OPEN_BRACE:
+            return self.dict_()
+        if current_t == tt.ELLIPSIS:
+            return nodes.OperatorLiteral(current.span, current.value)
         raise NotImplementedError(f'atom with value {current}')
+
+    def tuple_group_generator(self) -> nodes.Expression:
+        line = self.take_until_type(self._tokens[self._index : ], tt.NEWLINE)
+        line_types = list(map(lambda x: x.type, line))
+        if tt.FOR in line_types:
+            return self.generator()
+        if tt.YIELD in line_types:
+            return self.group()
+        return self.tuple_()
+
+    def list_(self) -> nodes.CollectionExpression:
+        line = self.take_until_type(self._tokens[self._index : ], tt.NEWLINE)
+        line_types = list(map(lambda x: x.type, line))
+        if tt.FOR in line_types:
+            return self.generator()
+        
+        open_bracket = self.current_token
+        if (next_t := self.right_token()).type == tt.CLOSE_BRACKET:
+            return nodes.CollectionExpression(TextSpan(open_bracket.span.begin, next_t.span.begin + 1), [])
+        exprs = self.star_named_expressions()
+        self.move_next() # skip close_bracket
+        return nodes.CollectionExpression(union_spans(open_bracket.span, exprs[-1].span), exprs)
+
+    def tuple_(self) -> nodes.CollectionExpression:
+        open_paren = self.current_token
+        if (next_t := self.right_token()).type == tt.CLOSE_PAREN:
+            return nodes.CollectionExpression(TextSpan(open_paren.span.begin, next_t.span.begin + 1), [])
+        exprs = self.star_named_expressions()
+        return nodes.CollectionExpression(union_spans(open_paren.span, exprs[-1].span), exprs)
+
+    def group(self) -> nodes.UnaryOperatorExpression:
+        raise NotImplementedError('group')
+
+    def generator(self) -> nodes.GeneratorExpression:
+        raise NotImplementedError('generator')
+
+    def dict_(self) -> nodes.GeneratorExpression:
+        raise NotImplementedError('dict_')
 
     def assign_op(self) -> nodes.OperatorLiteral:
         current = self.current_token
@@ -399,7 +453,7 @@ class Parser:
         keyword : Token = self.current_token
         self.move_next()
         node : nodes.Expression= self.star_expressions()
-        return nodes.ReturnStatement(nodes.TextSpan(keyword.position, node.span.end - keyword.position), node)
+        return nodes.ReturnStatement(TextSpan(keyword.position, node.span.end - keyword.position), node)
 
     def star_expressions(self) -> nodes.Node:
         exprs = [self.star_expression()]
@@ -411,12 +465,29 @@ class Parser:
 
         return nodes.CollectionNode(union_spans(exprs[0].span, exprs[-1].span), exprs)
 
+    def star_named_expressions(self) -> nodes.Node:
+        exprs = [self.star_named_expression()]
+        while self.current_token.type == tt.COMMA:
+            self.move_next()
+            exprs.append(self.star_named_expression())
+        if len(exprs) == 1:
+            return exprs[0]
+
+        return nodes.CollectionNode(union_spans(exprs[0].span, exprs[-1].span), exprs)
+
     def star_expression(self) -> nodes.Expression:
         if (op_token := self.current_token).type == tt.STAR:
             op = nodes.OperatorLiteral(op_token.span, op_token.value)
             expr = self.bitwise_or()
             return nodes.UnaryOperatorExpression(union_spans(op.span, expr.span), op, expr)
         return self.expression()
+
+    def star_named_expression(self) -> nodes.Expression:
+        if (op_token := self.current_token).type == tt.STAR:
+            op = nodes.OperatorLiteral(op_token.span, op_token.value)
+            expr = self.bitwise_or()
+            return nodes.UnaryOperatorExpression(union_spans(op.span, expr.span), op, expr)
+        return self.named_expr()
 
     def move_next(self) -> Token:
         self._index += 1
@@ -432,10 +503,12 @@ class Parser:
 
     def match(self, token_type: int, token: Token):
         return token_type == token.type
-
-
-def union_spans(s1: nodes.TextSpan, s2: nodes.TextSpan) -> nodes.TextSpan:
-    begin = s1.begin if s1.begin > s2.begin else s2.begin
-    end = s1.end if s1.end > s2.end else s2.end
-
-    return nodes.TextSpan(begin, begin - end)
+    
+    def take_until_type(self, tokens : List[Token], end_type : tt):
+        res : List[Token] = []
+        for item in tokens:
+            if item.type != end_type:
+                res.append(item)
+            else:
+                return res
+        return res
