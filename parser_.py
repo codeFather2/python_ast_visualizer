@@ -1,4 +1,3 @@
-import re
 import nodes
 from typing import List
 from lexer_utils import TokenType as tt

@@ -1,7 +1,5 @@
 from parser_ import Parser
 from lexer import Tokenizer
-from termcolor import colored
-from logging import getLogger, log
 from visualizer import Visualizer, VisualizingMode as vis_mode
 from logger import create_logger
 
@@ -61,7 +59,7 @@ def main():
     parser = Parser(tokens, logger)
     result = parser.parse()
     logger.info('Parsing is finished.')
-    Visualizer(result, params.file_name, input_file, params.output).visualize(params.mode)
+    Visualizer(result, params.file_name, input_file, params.output, logger).visualize(params.mode)
     logger.info('Visualization is finished.')
 
 

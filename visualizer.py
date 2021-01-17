@@ -1,9 +1,9 @@
-from io import TextIOWrapper
 import graphviz as g
 import nodes
-from typing import List, Tuple
+from typing import List
 from enum import Enum
 from lexer_utils import TokenType
+from logging import Logger
 
 class VisualizingMode(Enum):
     AST = 0
@@ -11,10 +11,11 @@ class VisualizingMode(Enum):
 
 class Visualizer:
 
-    def __init__(self, root : nodes.Root, file_name: str, source_code : str, output_file : str) -> None:
+    def __init__(self, root : nodes.Root, file_name: str, source_code : str, output_file : str, logger : Logger) -> None:
         self.root = root
         self.file_name = file_name
         self.output = output_file if output_file and len(output_file) > 0 else 'output/output'
+        self.logger = logger
         self.id = 0
         self.graph = g.Digraph(f"Visualizing of {file_name}")
         self.source_code = source_code
@@ -27,6 +28,7 @@ class Visualizer:
         if mode == VisualizingMode.AST:
             self.visualize_('Root', self.root, self.visualize_ast)
         elif mode == VisualizingMode.EXECUTION:
+            self.logger.info(f'{VisualizingMode.EXECUTION} status is WIP')
             self.visualize_('Root', self.root, self.visualize_execution)
         self.graph.render(f'{self.output}{mode}')
 
