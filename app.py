@@ -2,6 +2,7 @@ from parser_ import Parser
 from lexer import Tokenizer
 from visualizer import Visualizer, VisualizingMode as vis_mode
 from logger import create_logger
+from os.path import isfile
 
 class Parameters:
     def __init__(self, file_name : str, output : str, mode: vis_mode) -> None:
@@ -12,7 +13,7 @@ class Parameters:
 help_message = '''\nWelcome to AST builder/visualizer\n
 supported parameters:\n
 -h - print help\n
--i - input file\n
+-f - input file\n
 -o - output file_name (output/output by default)\n
 -m - visualization mode (AST or Execution)\n
 '''
@@ -32,7 +33,7 @@ def prepare_params() -> Parameters:
             if key == 'o':
                 i += 1
                 output = argv[i]
-            elif key == 'i':
+            elif key == 'f':
                 i += 1
                 file_name = argv[i]
             elif key == 'm':
@@ -49,6 +50,9 @@ def main():
         params = prepare_params()
     except Exception as ex:
         logger.error(f'Something went wrong while processing parameters : {repr(ex)}')
+        exit()
+    if not isfile(params.file_name):
+        logger.error(f'Input file does not exist or it\'s not a file (-f {params.file_name})')
         exit()
     input_file = open(params.file_name, 'r').read()
     tokenizer = Tokenizer(input_file, logger)
