@@ -11,9 +11,10 @@ class VisualizingMode(Enum):
 
 class Visualizer:
 
-    def __init__(self, root : nodes.Root, file_name: str, source_code : str) -> None:
+    def __init__(self, root : nodes.Root, file_name: str, source_code : str, output_file : str) -> None:
         self.root = root
         self.file_name = file_name
+        self.output = output_file if output_file and len(output_file) > 0 else 'output/output'
         self.id = 0
         self.graph = g.Digraph(f"Visualizing of {file_name}")
         self.source_code = source_code
@@ -27,7 +28,7 @@ class Visualizer:
             self.visualize_('Root', self.root, self.visualize_ast)
         elif mode == VisualizingMode.EXECUTION:
             self.visualize_('Root', self.root, self.visualize_execution)
-        self.graph.render(f'output/output{mode}')
+        self.graph.render(f'{self.output}{mode}')
 
     def visualize_(self, node_name: str, node: nodes.Node, handler) -> str:
         key = self.add_node(node_name, node)
@@ -52,6 +53,7 @@ class Visualizer:
         return key
 
     def visualize_execution(self, key: str, node: nodes.Node, children: list) ->  str:
+        #WIP
         child_keys: List[str] = []
         if len(children) == 0 and hasattr(node, 'children'):
             for child in node.children:
