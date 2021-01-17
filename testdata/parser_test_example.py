@@ -1,3 +1,22 @@
+dict_ = {
+    'key' : 1,
+    5+2 : 'value',
+    'nested' : {
+        'nested1' : test_func(),
+        nested2 : nested_value
+    }
+}
+
+dict_2 = {key : value, key1: value,
+key3 : value}
+
+slice_ = list_[:1]
+slice_1 = list_[::1]
+slice_2 = list_[0:1]
+slice_2 = list_[0:]
+slice_2 = list_[0:]
+
+
 def test_func(count_iters):
 
     sum_1 = 0

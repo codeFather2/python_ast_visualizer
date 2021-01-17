@@ -264,9 +264,55 @@ class Parser:
             args = self.generator_args()
             return nodes.InvocationExpression(union_spans(atom.span, args[-1].span), atom, args)
         elif current.type == tt.OPEN_BRACKET:
-            raise NotImplementedError('primary atom with slices (indexer os slice)')
+            args = self.slices()
+            return nodes.IndexerExpression(union_spans(atom.span, args.span), atom, args)
         return atom
-    
+
+    def slices(self) -> nodes.CollectionExpression:
+        open_bracket = self.current_token
+        self.move_next()
+        slices_ : nodes.Expression = [] 
+        while self.current_token.type != tt.CLOSE_BRACKET:
+            if self.current_token.type == tt.COMMA:
+                continue
+            slices_.append(self.slice_())
+        close_bracket = self.current_token
+        self.move_next()
+        return nodes.CollectionExpression(union_spans(open_bracket.span, close_bracket.span), slices_)
+
+    def slice_(self) -> nodes.SliceExpression:
+        first_span = None
+        last_span = None
+        start = None
+        stop = None
+        step = None
+
+        if self.current_token.type == tt.COLON:
+            first_span = self.current_token.span
+            self.move_next()
+        else:
+            start = self.disjunction()
+            first_span = start.span
+        
+        if self.current_token.type == tt.COLON:
+            last_span = self.current_token.span
+            self.move_next()
+        else:
+            stop = self.disjunction()
+            last_span = stop.span
+
+        if self.current_token.type == tt.COLON:
+            last_span = self.current_token.span
+            self.move_next()
+        elif self.current_token.type not in [tt.COMMA, tt.CLOSE_BRACKET]:
+            step = self.disjunction()
+            last_span = step.span
+
+        return nodes.SliceExpression(union_spans(first_span, last_span), start, stop, step)
+        
+
+
+
     def generator_args(self) -> List[nodes.Expression]:
         #TODO: kwargs, generators, positional and keyword markers support
         open_paren = self.current_token
@@ -397,18 +443,23 @@ class Parser:
     def atom(self) -> nodes.Terminal:
         current = self.current_token
         current_t = current.type
-        self.move_next()
         if current_t == tt.NAME:
+            self.move_next()
             return nodes.IdToken(current.span, current.value)
         if current_t == tt.STRING:
+            self.move_next()
             return nodes.StringLiteral(current.span, current.value)
         if current_t == tt.NUMBER:
+            self.move_next()
             return nodes.NumberLiteral(current.span, current.value)
         if current_t == tt.NONE:
+            self.move_next()
             return nodes.NoneLiteral(current.span, current.value)
         if current_t == tt.PEGPARSER:
+            self.move_next()
             return nodes.EasterEggLiteral(current.span, current.value)
         if current_t in [tt.TRUE, tt.FALSE]:
+            self.move_next()
             return nodes.BooleanLiteral(current.span, current.value)
         if current_t == tt.OPEN_PAREN:
             return self.tuple_group_generator()
@@ -456,7 +507,24 @@ class Parser:
         raise NotImplementedError('generator')
 
     def dict_(self) -> nodes.GeneratorExpression:
-        raise NotImplementedError('dict_')
+        open_brace = self.current_token
+        self.move_next()
+        exprs : List[nodes.Expression] = []
+        skip_tokens = [tt.NEWLINE, tt.INDENT, tt.DEDENT, tt.COMMA]
+        while self.current_token.type != tt.CLOSE_BRACE:
+            if self.current_token.type in skip_tokens:
+                self.move_next()
+                continue
+            key = self.disjunction(),
+            if isinstance(key, tuple):
+                key = key[0]
+            self.move_next() #skip colon
+            value = self.disjunction()
+            exprs.append(nodes.KeyValueExpression(union_spans(key.span, value.span), key, value))
+
+        close_brace = self.current_token
+        self.move_next()
+        return nodes.CollectionExpression(union_spans(open_brace.span, close_brace.span), exprs)
 
     def assign_op(self) -> nodes.OperatorLiteral:
         current = self.current_token

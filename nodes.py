@@ -190,6 +190,19 @@ class CollectionExpression(Expression):
     def __init__(self, span: TextSpan, elements: List[Expression]) -> None: #list, dict, tuple, generator
         super().__init__(span, elements)
 
+class SliceExpression(Expression):
+    def __init__(self, span: TextSpan, start: Expression = None, stop: Expression = None, step: Expression = None) -> None:
+        super().__init__(span, [start, stop, step])
+        self.start = start
+        self.stop = stop
+        self.step = step
+
+class KeyValueExpression(Expression):
+    def __init__(self, span: TextSpan, key: Expression, value_ : Expression) -> None:
+        super().__init__(span, [key, value_])
+        self.key = key
+        self.value_ = value_
+
 class MemberReference(Expression):
     def __init__(self, span: TextSpan, target: Expression, member: IdToken) -> None:
         super().__init__(span, [target, member])
