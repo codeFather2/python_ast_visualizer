@@ -17,7 +17,7 @@ slice_2 = list_[0:]
 slice_2 = list_[0:]
 
 
-def test_func(count_iters):
+def test_func(count_iters, s):
 
     sum_1 = 0
     sum_2 = 0

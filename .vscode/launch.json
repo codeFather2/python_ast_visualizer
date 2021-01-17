@@ -15,7 +15,7 @@
             "type": "python",
             "request": "launch",
             "program": "app.py",
-            "args": ["-f", "testdata/parser_test_example.py", "-m", "exec"],
+            "args": ["-f", "testdata/parser_test_example.py", "-m", "ast"],
             "console": "integratedTerminal"
         },
     ]

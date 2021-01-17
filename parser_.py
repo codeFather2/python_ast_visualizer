@@ -126,12 +126,28 @@ class Parser:
         def_ = self.current_token
         name_token = self.move_next()
         name = nodes.IdToken(name_token.span, name_token.value)
-        self.move_next()
-        signature_line = take_tokens_until_type(self._tokens[self._index:], tt.COLON)
-        signature = nodes.WrapperNode(union_spans(signature_line[0].span, signature_line[-1].span), signature_line)
-        self.move_next(len(signature_line))
+        params = self.params()
         block = self.block()
-        return nodes.DefinitionStatement(union_spans(def_.span, block.span), name, signature, block)
+        return nodes.DefinitionStatement(union_spans(def_.span, block.span), name, params, block)
+
+    def params(self)-> nodes.CollectionNode:
+        open_paren = self.move_next()
+        params = []
+        self.move_next()
+        while self.current_token.type != tt.CLOSE_PAREN:
+            curr = self.current_token
+            if curr.type == tt.COMMA:
+                self.move_next()
+                continue
+            if curr.type in [tt.DIV, tt.AND_OP]:
+                params.append(nodes.Terminal(curr.span, curr.value))
+                self.move_next()
+            else:
+                params.append(self.var_decl())
+
+        close_paren = self.current_token
+        self.move_next()
+        return nodes.CollectionNode(union_spans(open_paren.span, close_paren.span), params)
 
     def class_stmt(self) -> nodes.Statement:
         raise NotImplementedError('class_stmt')
@@ -418,8 +434,10 @@ class Parser:
 
     def var_decl(self) -> nodes.Expression:
         name = self.atom()
-        self.move_next() #move next
-        annotation = self.expression()
+        annotation = None
+        if self.current_token.type == tt.COLON:
+            self.move_next() #skip colon
+            annotation = self.expression()
         assign_part = None
         assign_op = None
         if self.current_token.type == tt.ASSIGN:
@@ -429,8 +447,10 @@ class Parser:
 
         if assign_part:
             span = union_spans(name.span, assign_part.span)
-        else:
+        elif annotation:
             span = union_spans(name.span, annotation.span)
+        else:
+            return name
 
         return nodes.AssignmentExpression(span, name, assign_op, assign_part, annotation)
 
