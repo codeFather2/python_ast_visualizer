@@ -31,7 +31,7 @@ def test_func(count_iters):
     return sum_1 + sum_2
 
 
-def test_func(count_iters):
+def test_func_1(count_iters):
 
     sum_1 = 0
 
