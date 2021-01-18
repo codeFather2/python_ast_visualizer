@@ -1,14 +1,14 @@
-for i in range(100):
-    print(j)
-    a = 2+2*2
-        
+sum1 = 0
+sum2 = 0
 
-if condition:
-    print('true')
-elif not condition:
-    print('false')
-else:
-    print ('why not)')
-a = 2
-b = a + 1
-print(a,b)
+while sum1 <= countiters:
+    sum2 +=1
+
+    if sum1 == 0:
+        while sum2 <= countiters:
+            sum1 += 1
+    elif sum1 > 1:
+        if sum1 == 1:
+            test_func(sum1)
+
+return sum1 + sum2

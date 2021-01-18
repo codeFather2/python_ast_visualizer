@@ -1,4 +1,3 @@
-from os import remove
 import graphviz as g
 import nodes
 from typing import List, Tuple
@@ -140,7 +139,10 @@ class Visualizer:
         keys.append(condition)
         branches = []
         true_b = self.visualize_cfg('True', node.true_branch)
-        self.graph.edge(condition, true_b[0], label ='True', color = 'green')
+        first = true_b[0]
+        while isinstance(first, list):
+            first = first[0]
+        self.graph.edge(condition, first, label ='True', color = 'green')
         branches.append(true_b[-1])
 
         false_b = None
@@ -148,7 +150,7 @@ class Visualizer:
             false_b = self.prepare_if_execution(node.false_branch)
             self.graph.edge(condition, false_b[0], label ='False', color = 'red')
             false_b = false_b[-1]
-        else:
+        elif node.false_branch:
             false_b = self.visualize_cfg('False', node.false_branch) if node.false_branch else None
             self.graph.edge(condition, false_b[0], label ='False', color = 'red')
             false_b = false_b[-1]
