@@ -15,7 +15,7 @@ supported parameters:\n
 -h - print help\n
 -f - input file\n
 -o - output file_name (output/output by default)\n
--m - visualization mode (AST or Execution)\n
+-m - visualization mode (AST or CFG)\n
 '''
 
 def prepare_params() -> Parameters:
@@ -38,7 +38,7 @@ def prepare_params() -> Parameters:
                 file_name = argv[i]
             elif key == 'm':
                 i += 1
-                mode = vis_mode.AST if argv[i].lower() == 'ast' else vis_mode.EXECUTION
+                mode = vis_mode.AST if argv[i].lower() == 'ast' else vis_mode.CFG
     return Parameters(file_name, output, mode)
 
 

@@ -8,7 +8,7 @@ from logging import Logger
 
 class VisualizingMode(Enum):
     AST = 0
-    EXECUTION = 1
+    CFG = 1
 
 class SubTree:
     def __init__(self, key, children, is_branching) -> None:
@@ -33,7 +33,7 @@ class Visualizer:
         self.graph = g.Digraph(f"Visualizing of {file_name}")
         self.source_code = source_code
         self.fields_to_exclude = ['children', 'value', 'span', 'wrapped_tokens']
-        self.all_keys = []
+        self.definitions : List[str] = []
 
     def visualize(self, mode : VisualizingMode):
         self.id = 0
@@ -41,9 +41,8 @@ class Visualizer:
 
         if mode == VisualizingMode.AST:
             self.visualize_ast('Root', self.root)
-        elif mode == VisualizingMode.EXECUTION:
-            self.logger.info(f'{VisualizingMode.EXECUTION} status is WIP')
-            self.visualize_execution('Root', self.root)
+        elif mode == VisualizingMode.CFG:
+            self.visualize_cfg('Root', self.root)
         self.graph.render(f'{self.output}{mode}')
 
 
@@ -66,117 +65,160 @@ class Visualizer:
                 self.graph.edge(key, child_key)
         return key
 
-    def visualize_execution(self, name: str, node: nodes.Node) -> SubTree:
+    def visualize_cfg(self, name: str, node: nodes.Node) -> List[str]:
+        keys = self.visualize_cfg_for_node(name, node)
+        if keys:
+            return keys
+
+        return self.visualize_children(name, node)
+    
+    def visualize_children(self, name, node) -> List[str]:
         key = self.add_node(name, node)
         children = self.get_children(node)
 
-        if isinstance(node, nodes.WrapperNode) or issubclass(node.__class__, nodes.Expression):
-            return SubTree(key, [], False)
-
-        sub_trees: List[SubTree] = []
+        child_keys: List[SubTree] = []
         if len(children) == 0 and hasattr(node, 'children'):
             for child in node.children:
-                self.handle_child_execution(sub_trees, child, '')
+                if not child:
+                    continue
+                child_keys.append(self.visualize_cfg('', child))
         else:
             for name, child in children:
-                self.handle_child_execution(sub_trees, child, name)
+                if not child:
+                    continue
+                child_keys.append(self.visualize_cfg(name, child))
 
-        if len(sub_trees) > 0:
-            first = sub_trees[0]
-            while first.key == None:
-                first = first.children[0]
-            self.graph.edge(key, first.key)
-            self.add_edges_by_list(sub_trees)
-        return SubTree(None, sub_trees, False)
+        if len(child_keys) > 0:
+            first = child_keys[0]
+            while isinstance(first, list):
+                first = first[0]
+            self.graph.edge(key, first)
+            self.add_edges_by_list(child_keys)
+        return [key, child_keys]
 
-    def handle_child_execution(self, sub_trees, child, name):
-        if child is None:
-            return
-        elif isinstance(child, nodes.BlockStatement):
+    def visualize_cfg_for_node(self, name, node: nodes.Node)-> List[str]:
+        if isinstance(node, nodes.WrapperNode) or issubclass(node.__class__, nodes.Expression):
+            return self.add_node(name, node)
+        if isinstance(node, nodes.BlockStatement):
             st_keys = []
-            for st in child.children:
-                st_keys.append(self.visualize_execution('', st))
+            for st in node.children:
+                st_keys.append(self.visualize_cfg('', st))
             self.add_edges_by_list(st_keys)
-            sub_trees.append(SubTree(None, st_keys, False))
-        elif isinstance(child, nodes.IfElseStatement):
-            sub_trees.append(self.prepare_if_execution(child))
+            return [st_keys[0], st_keys[-1]] if len(st_keys) > 1 else st_keys
+        if isinstance(node, nodes.IfElseStatement):
+            return self.prepare_if_execution(node)
+        if isinstance(node, nodes.ForStatement):
+            return self.prepare_loop_execution('For', node.iterator, node.block)
+        if isinstance(node, nodes.WhileStatement):
+            return self.prepare_loop_execution('While', node.condition, node.block)
+        if isinstance(node, nodes.DefinitionStatement):
+            return self.prepare_def_execution(node)
+        if isinstance(node, nodes.ReturnStatement):
+            return self.prepare_return_execution(node)
+        return None
+
+    def prepare_loop_execution(self, keyword, iterator_condition, node_block):
+        iterator = self.visualize_cfg(keyword, iterator_condition)
+        block = self.visualize_cfg('', node_block)
+        first = block[0]
+        while isinstance(first, list):
+            first = first[0]
+        self.graph.edge(iterator, first, color='purple', label='Loop entry')
+        last = block[-1]
+        while isinstance(last[-1], list):
+            last = last[-1]
+        if isinstance(last, list):
+            for st in last:
+                self.graph.edge(st, iterator, color='blue', label='Iteration')
         else:
-            sub_trees.append(self.visualize_execution(name, child))
+            self.graph.edge(last, iterator, color='blue', label='Iteration')
+        return [iterator]
 
     def prepare_if_execution(self, node : nodes.IfElseStatement):
         keys = []
-        condition = self.visualize_execution('If', node.condition)
+        condition = self.visualize_cfg('If', node.condition)
         keys.append(condition)
         branches = []
-        true_b = None
-        if isinstance(node.true_branch, nodes.BlockStatement):
-            st_keys = []
-            for st in node.children:
-                st_keys.append(self.visualize_execution('', st))
-            true_b = SubTree(None, st_keys, False)
-        else:
-            true_b = self.visualize_execution('True', node.true_branch)
+        true_b = self.visualize_cfg('True', node.true_branch)
+        self.graph.edge(condition, true_b[0], label ='True', color = 'green')
+        branches.append(true_b[-1])
 
-        branches.append(true_b)
         false_b = None
         if node.false_branch and isinstance(node.false_branch, nodes.IfElseStatement):
             false_b = self.prepare_if_execution(node.false_branch)
-            self.graph.edge(condition.key, false_b.key)
-        elif isinstance(node.false_branch, nodes.BlockStatement):
-            st_keys = []
-            for st in node.children:
-                st_keys.append(self.visualize_execution('', st))
-            false_b = SubTree(None, st_keys, False)
+            self.graph.edge(condition, false_b[0], label ='False', color = 'red')
+            false_b = false_b[-1]
         else:
-            false_b = self.visualize_execution('False', node.false_branch) if node.false_branch else None
+            false_b = self.visualize_cfg('False', node.false_branch) if node.false_branch else None
+            self.graph.edge(condition, false_b[0], label ='False', color = 'red')
+            false_b = false_b[-1]
 
         if false_b:
-            branches.append(false_b)
-        condition.children = branches
-        condition.branching = True
-        return condition
+            if isinstance(false_b, list):
+                branches.extend(false_b)
+            else:
+                branches.append(false_b)
+        return [condition, branches]
 
-    def add_edges_by_list(self, keys : List[SubTree]):
+    def prepare_def_execution(self, node: nodes.DefinitionStatement) -> List[str]:
+        def_title = f'{node.name}{self.get_text_for_node(node.signature)}'
+        self.definitions.append(def_title)
+        key = str(self.id)
+        self.graph.node(key, def_title)
+        self.id += 1
+        body = self.visualize_cfg('', node.body)
+        first = body[0]
+        while isinstance(first, list):
+            first = first[-1]
+        self.graph.edge(key, first, color='purple', label='Definition entry')
+        self.definitions.pop()
+        return [key]
+    
+    def prepare_return_execution(self, node: nodes.ReturnStatement) -> List[str]:
+        key = str(self.id)
+        text = self.get_text_for_node(node)
+        if len(self.definitions) > 0:
+            text = f'Exit from {self.definitions[-1]}\n{text}'
+        self.graph.node(key, text, color='red')
+        self.id += 1
+        return [key]
+
+    def add_edges_by_list(self, keys : list):
         for index in range(1, len(keys)):
             current = keys[index]
             prev = keys[index - 1]
-            self.add_edge(prev, current)
-
-    def add_edge(self, prev: SubTree, current: SubTree):
-        curr_len = len(current.children)
-        prev_len = len(prev.children)
-        if curr_len == 0 and prev_len == 0:
-            self.graph.edge(prev.key, current.key)
-        elif not current.key:
-            self.add_edge(prev, current.children[0])
-        elif not prev.key:
-            self.add_edge(prev.children[-1], current)
-        elif prev.branching:
-            for prev_child in prev.children:
-                self.add_edge(prev_child, current)
-        elif current.branching:
-            for curr_child in current.children:
-                self.add_edge(prev, curr_child)
-        else:
-            self.graph.edge(prev.key, current.key)
+            if isinstance(current, list):
+                self.add_tail_to_heads(prev, current)
+            elif isinstance(prev, list):
+                self.add_tails_to_head(prev, current)
+            else:
+                self.graph.edge(prev, current)
 
     def add_tail_to_heads(self, tail, heads):
-        for head in heads.children:
+        for head in heads:
             if isinstance(head, list):
                     continue
             elif isinstance(tail, list):
                 self.add_tails_to_head(tail, head)
+                return
             else:
                 self.graph.edge(tail, head)
 
     def add_tails_to_head(self, tails, head):
         for tail in tails[::-1]:
-            if isinstance(tail, list):
-                self.add_tails_to_head(tail, head)
-            elif isinstance(head, list):
+            if isinstance(head, list):
                 self.add_tail_to_heads(tail, head)
+            elif isinstance(tail, list):
+                if len(tail) == 0:
+                    return
+                while isinstance(tail[-1], list):
+                    tail = tail[-1]
+                for t in tail:
+                    self.graph.edge(t, head)
+                return
             else:
                 self.graph.edge(tail, head)
+                return
 
     def add_node(self, node_name: str, node: nodes.Node) -> str:
         key = str(self.id)
